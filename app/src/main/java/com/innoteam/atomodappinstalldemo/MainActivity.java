@@ -10,16 +10,24 @@ import android.net.Uri;
 import android.os.Build;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.telephony.CellLocation;
+import android.telephony.PhoneStateListener;
+import android.telephony.ServiceState;
+import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.format.Time;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.Calendar;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -27,15 +35,75 @@ public class MainActivity extends ActionBarActivity {
 
     private static RestClient mytask;
     private static RestClient2 mytask2;
+    private TelephonyManager telephonyManager;
+    private String reqId = "";
+    TextView mainTextView;
     Button button;
+
+    final public static String ATOM = "com.innoteam.atom.ONDEMANDINSTALL";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         addListenerOnButton();
+        Context mContext = getApplicationContext();
+        telephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+
+         mainTextView = (TextView) findViewById(R.id.networktext);
+
+
+        registerTM();
+
+
     }
 
+
+    PhoneStateListener phoneStateListener = new PhoneStateListener() {
+        public void onCallForwardingIndicatorChanged(boolean cfi) {}
+        public void onCallStateChanged(int state, String incomingNumber) {}
+        public void onCellLocationChanged(CellLocation location) {}
+        public void onDataActivity(int direction) {}
+        public void onDataConnectionStateChanged(int state) {}
+        public void onMessageWaitingIndicatorChanged(boolean mwi) {}
+        public void onServiceStateChanged(ServiceState serviceState) {}
+        public void onSignalStrengthsChanged(SignalStrength asu) {
+
+            Calendar c = Calendar.getInstance();
+            int seconds = c.get(Calendar.SECOND);
+
+            Time   time = new Time ();
+            time.setToNow();
+
+            String str="Hora:"+time.hour+":"+time.minute+":"+time.second+"\n";
+
+            str+="GSM Signal strenght: " + asu.getGsmSignalStrength()+ "\n";
+            str+="GSM bit error rate (0-7, 99): " + asu.getGsmBitErrorRate()+ "\n";
+            str+="signal to noise ratio: " + asu.getEvdoSnr()+ "\n";
+
+            str+="CDMA RSSI value in dBm: " + asu.getCdmaDbm() + "\n";
+            str+="CDMA Ec/Io value in dB*10: " + asu.getCdmaEcio()+ "\n";
+            str+="EVDO RSSI value in dBm: " + asu.getEvdoDbm()+ "\n";
+            str+="EVDO Ec/Io value in dB*10: " + asu.getEvdoEcio()+ "\n";
+            str+="Other info: " + asu.toString();
+            mainTextView.setText(str);
+
+        }
+    };
+
+
+        public void registerTM (){
+            telephonyManager.listen(phoneStateListener,
+                    PhoneStateListener.LISTEN_CALL_FORWARDING_INDICATOR |
+                            PhoneStateListener.LISTEN_CALL_STATE |
+                            PhoneStateListener.LISTEN_CELL_LOCATION |
+                            PhoneStateListener.LISTEN_DATA_ACTIVITY |
+                            PhoneStateListener.LISTEN_DATA_CONNECTION_STATE |
+                            PhoneStateListener.LISTEN_MESSAGE_WAITING_INDICATOR |
+                            PhoneStateListener.LISTEN_SERVICE_STATE |
+                            PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+
+        }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -70,7 +138,7 @@ public class MainActivity extends ActionBarActivity {
                             public void onClick(DialogInterface dialog,int id) {
                                 // if this button is clicked, close
                                 // current activity
-                                MainActivity.this.finish();
+                                //MainActivity.this.finish();
                             }
                         });
 
@@ -81,9 +149,9 @@ public class MainActivity extends ActionBarActivity {
                 // show it
                 alertDialog.show();
                 try {
-                    addOnAppUser("https://api.parse.com/1/functions/odAppInstallDev");
-                    Thread.sleep(1000);
-                    //notifyDevice("https://android.googleapis.com/gcm/send");
+                    addOnAppUser("https://api.parse.com/1/functions/odAppInstall");
+                    Thread.sleep(5000);
+                    notifyDevice();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -127,8 +195,10 @@ public class MainActivity extends ActionBarActivity {
 
                 try {
                     JSONObject jsonObject = new JSONObject(mytask.getResponse());
-                    Log.d("MYTASK", "JSON OBJECT" + jsonObject.toString());
+                    JSONObject result  = jsonObject.getJSONObject("result");
+                    reqId=result.getString("objectId");
 
+                    Log.d("MYTASK", "JSON OBJECT" + jsonObject.toString()+" - -" + reqId);
 
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -140,6 +210,8 @@ public class MainActivity extends ActionBarActivity {
 
         TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
 
+        String s1 = getString(R.string.X_Parse_Application_Id);
+        String s2 = getString(R.string.X_Parse_REST_API_Key);
         mytask.AddParam("imsi", tm.getSubscriberId());
         mytask.AddParam("userId", "7FO6tM161x");
         mytask.AddParam("mcc", "732");
@@ -147,39 +219,21 @@ public class MainActivity extends ActionBarActivity {
         mytask.AddParam("appName", "Deezer");
         mytask.AddParam("version", "23");
         mytask.AddParam("appId", "LDPrNXHyBC");
-        mytask.AddHeader("X-Parse-Application-Id","Tma29vMR9R7y0kjmVLwAQtIOQpedkIqF7vKiW1kG");
-        mytask.AddHeader("X-Parse-REST-API-Key","39mqoaMtyTpYchP8n5kkjzrNypLdVYxD2SxiWWEi");
+        mytask.AddHeader("X-Parse-Application-Id",s1);
+        mytask.AddHeader("X-Parse-REST-API-Key",s2);
         mytask.AddHeader("Content-Type","application/json");
         mytask.execute("POST");
 }
 
 
-    public void notifyDevice(String url){
+    public void notifyDevice(){
+        Intent intent = new Intent(ATOM);
+        intent.putExtra("requestId",reqId);
 
-        mytask2 = new RestClient2(url);
-
-        mytask2.setMyTaskCompleteListener(new RestClient2.OnTaskComplete() {
-            @Override
-            public void setMyTaskComplete(String message, int number) {
-
-                Log.d("MYTASK", "APPList recibido del servidor");
-
-                try {
-                    JSONObject jsonObject = new JSONObject(mytask2.getResponse());
-                    Log.d("MYTASK", "JSON OBJECT" + jsonObject.toString());
-
-
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-
-            }
-        });
-        String version = Build.VERSION.RELEASE;
-
-        mytask2.AddHeader("Authorization","key=AIzaSyAOgBIqM3hVkJXas61RTUKZlIxi-l3t-Ak");
-        mytask2.AddHeader("Content-Type","application/json");
-        mytask2.execute("POST");
+        sendBroadcast(intent);
     }
+
+
+
 
 }

@@ -26,5 +26,11 @@
             android:text="Comprar ahora - $8.15"
             android:id="@+id/button1"
             android:layout_gravity="center_horizontal" />
+
+        <TextView
+            android:id="@+id/networktext"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            />
     </LinearLayout>
 </RelativeLayout>
