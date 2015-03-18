@@ -1,19 +1,23 @@
 package com.innoteam.atomodappinstalldemo;
 
-
 import android.os.AsyncTask;
 import android.util.Log;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
-import org.apache.http.client.HttpClient;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,14 +26,14 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 
 
-public class RestClient2 extends AsyncTask<String, Void, Boolean> {
+public class RestClientStrong extends AsyncTask<String, Void, Boolean> {
 
     private ArrayList<NameValuePair> params;
+    private ArrayList<NameValuePair> urlParams;
     private ArrayList<NameValuePair> headers;
 
     private String url;
@@ -38,7 +42,7 @@ public class RestClient2 extends AsyncTask<String, Void, Boolean> {
     private String response;
     private OnTaskComplete onTaskComplete;
 
-    private static final String TAG = "ASYNCTASK";
+    private static final String TAG = "ATOM_ASYNCTASK";
 
     @Override
     protected void onPreExecute() {
@@ -49,7 +53,11 @@ public class RestClient2 extends AsyncTask<String, Void, Boolean> {
     @Override
     protected void onPostExecute(Boolean result) {
         //Sending execution control to callback method in MainActivity
-        onTaskComplete.setMyTaskComplete(message, 1);
+
+        if (message != null && response != null)
+            onTaskComplete.setMyTaskComplete(message, 1);
+        else
+            onTaskComplete.setMyTaskComplete("",1);
     }
 
     @Override
@@ -79,34 +87,69 @@ public class RestClient2 extends AsyncTask<String, Void, Boolean> {
                         request.addHeader(h.getName(), h.getValue());
                     }
 
-                    executeRequest(request, url);
+                    //executeRequest(request, url);
                     break;
                 }
                 case "POST": {
                     Log.d(TAG,"Inicio del POST");
-                    HttpPost request = new HttpPost(url);
+
+                    String combinedParams = "";
+                    if (!urlParams.isEmpty()){
+                        if (!urlParams.isEmpty()) {
+                            combinedParams += "?";
+                            for (NameValuePair p : urlParams) {
+                                String paramString = p.getName() + "=" + URLEncoder.encode(p.getValue(), "UTF-8");
+                                if (combinedParams.length() > 1) {
+                                    combinedParams += "&" + paramString;
+                                } else {
+                                    combinedParams += paramString;
+                                }
+                            }
+                        }
+
+                    }
+
+                    HttpPost request = new HttpPost(url+combinedParams);
+
+                    HttpParams httpParams = new BasicHttpParams();
+                    HttpConnectionParams.setConnectionTimeout(httpParams,5000);
+                    HttpConnectionParams.setStaleCheckingEnabled(httpParams,true);
+                    HttpConnectionParams.setSoTimeout(httpParams,5000);
+
+                    request.setParams(httpParams);
 
                     // add headers
                     for (NameValuePair h : headers) {
                         request.addHeader(h.getName(), h.getValue());
                     }
 
-                    StringEntity se = null;
-                    try {
-                        se = new StringEntity(
-                                "{\"registration_ids\": [\"APA91bFOrnFBz-n38OMM5w8cWvS_3cOwDJYiFRQW7t5T2ELGilcQ63UGDeX0mil_ySVUWfoDeuyjlPKvJA6_oBw_E1pMZ10SieRdJGuH20G0jo60xAo-hTkI60xhgilbYKcHXDodb9d4lAsCrN1EJV4Q5X2_xF7xcw\"],\"data\": {\"score\": \"5x1\",\"time\": \"15:10\"}}"
-                        );
-                        se.setContentType("application/json");
-                        request.setEntity(se);
-                    } catch (UnsupportedEncodingException e1) {
-                        e1.printStackTrace();
-                    }
 
+                    if (!params.isEmpty()) {
+                        JSONObject data = new JSONObject();
+                        try {
+                            for (NameValuePair p : params) {
+                                data.put(p.getName(),p.getValue());
+                                Log.d(TAG,p.getName()+":"+p.getValue());
+                            }
+                            JSONArray jsonArray = new JSONArray();
+                            jsonArray.put(data);
+
+                            StringEntity se = new StringEntity(data.toString());
+                            se.setContentType("application/json");
+                            request.setEntity(se);
+
+                        } catch (JSONException e) {
+                            Log.e(TAG,"Error creando el JSON data");
+                            e.printStackTrace();
+                        }
+
+                    }
                     Log.d(TAG,"Antes de Execute Request");
-                    executeRequest(request, url);
+
+                    executeRequest(request, url+combinedParams);
 
                     if (response != null) {
-                        Log.d("ASYNC", response);
+                        Log.d(TAG, response);
 
                     }
 
@@ -117,41 +160,39 @@ public class RestClient2 extends AsyncTask<String, Void, Boolean> {
         } catch (Exception e){
             e.printStackTrace();
         }
+
         return false;
     }
 
-
-
-
-
-    private void executeRequest(HttpUriRequest request, String url) throws Exception {
+    private void executeRequest(HttpPost request, String url) throws Exception {
         Log.d(TAG,"Inicio del executeRequest");
-        HttpClient client = new DefaultHttpClient();
 
-        HttpResponse httpResponse;
+        CloseableHttpClient httpclient = HttpClients.createDefault();
 
         try {
             Log.d(TAG,"Envio de SOlicitud al Server");
-            httpResponse = client.execute(request);
-            responseCode = httpResponse.getStatusLine().getStatusCode();
-            message = httpResponse.getStatusLine().getReasonPhrase();
 
-            HttpEntity entity = httpResponse.getEntity();
+            System.out.println("Executing request " + request.getRequestLine());
 
-            if (entity != null) {
+            // Create a custom response handler
+            ResponseHandler<String> responseHandler = new ResponseHandler<String>() {
 
-                InputStream instream = entity.getContent();
+                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
+                    HttpEntity entity = response.getEntity();
+                    int responseCode = response.getStatusLine().getStatusCode();
+                    message = response.getStatusLine().getReasonPhrase();
+                    return entity != null ? EntityUtils.toString(entity) : null;
+                }
 
-                response = convertStreamToString(instream);
-
-                // Closing the input stream will trigger connection release
-                instream.close();
-            }
-
-        } catch (Exception e) {
-            client.getConnectionManager().shutdown();
-            throw e;
+            };
+            response = httpclient.execute(request, responseHandler);
+            System.out.println("----------------------------------------");
+            System.out.println(response);
+        } finally {
+            httpclient.close();
         }
+
+
     }
 
     private static String convertStreamToString(InputStream is) throws IOException {
@@ -187,14 +228,19 @@ public class RestClient2 extends AsyncTask<String, Void, Boolean> {
         return responseCode;
     }
 
-    public RestClient2(String url) {
+    public RestClientStrong(String url) {
         this.url = url;
         params = new ArrayList<NameValuePair>();
+        urlParams = new ArrayList<NameValuePair>();
         headers = new ArrayList<NameValuePair>();
     }
 
     public void AddParam(String name, String value) {
         params.add(new BasicNameValuePair(name, value));
+    }
+
+    public void AddUrlParam(String name, String value) {
+        urlParams.add(new BasicNameValuePair(name, value));
     }
 
 
@@ -212,3 +258,9 @@ public class RestClient2 extends AsyncTask<String, Void, Boolean> {
 
 
 }
+
+
+
+
+
+

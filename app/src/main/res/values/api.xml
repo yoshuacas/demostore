@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="X_Parse_Application_Id">PVSrAhiZOPl8KmQ1TZJ8A6PURmsRXYp3xkCJYuL2</string>
-    <string name="X_Parse_REST_API_Key">9Zz5CGLylLBTOKGo7GwPBPYtZ8yvB1cpk08UJ9SN</string>
-    <string name="X_Parse_REST_APP_Key">Lzt8BzltH1wA6zVizOXmLKl2kP1HHFtHwcBdlBle</string>
+    <string name="strongURLLogin">https://atom.innoteam.co:3000/api/UsersAtom/login</string>
+    <string name="strongURLPush">https://atom.innoteam.co:3000/api/OnDemandAppInstallRequests/pushApp</string>
+
+    <string name="username">tigo_admin@tigo.com</string>
+    <string name="password">}9sjx28!wdN6*j</string>
+
+    <string name="atomAppId">55030834a22afce0a7633a03</string>
 
 </resources>

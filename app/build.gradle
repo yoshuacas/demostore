@@ -13,15 +13,15 @@ android {
     }
     productFlavors {
         stage {
-            applicationId "com.innoteam.atom"
+            applicationId "com.innoteam.atomodappinstalldemo"
             versionName "1.0-stage"
         }
         prod {
-            applicationId "com.innoteam.atom"
+            applicationId "com.innoteam.atomodappinstalldemo"
             versionName "1.0-prod"
         }
         dev {
-            applicationId "com.innoteam.atom"
+            applicationId "com.innoteam.atomodappinstalldemo"
             versionName "1.0-dev"
         }
 

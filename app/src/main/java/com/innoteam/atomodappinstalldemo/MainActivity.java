@@ -33,10 +33,11 @@ import java.util.Calendar;
 public class MainActivity extends ActionBarActivity {
     final Context context = this;
 
-    private static RestClient mytask;
-    private static RestClient2 mytask2;
+    private static RestClientStrong mytask;
+
     private TelephonyManager telephonyManager;
     private String reqId = "";
+    private String token = null;
     TextView mainTextView;
     Button button;
 
@@ -86,7 +87,7 @@ public class MainActivity extends ActionBarActivity {
             str+="EVDO RSSI value in dBm: " + asu.getEvdoDbm()+ "\n";
             str+="EVDO Ec/Io value in dB*10: " + asu.getEvdoEcio()+ "\n";
             str+="Other info: " + asu.toString();
-            mainTextView.setText(str);
+            //mainTextView.setText(str);
 
         }
     };
@@ -148,13 +149,10 @@ public class MainActivity extends ActionBarActivity {
 
                 // show it
                 alertDialog.show();
-                try {
-                    addOnAppUser("https://api.parse.com/1/functions/odAppInstall");
-                    Thread.sleep(5000);
-                    notifyDevice();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+
+                    login(getApplicationContext().getString(R.string.strongURLLogin));
+
+
 
 
 
@@ -166,6 +164,36 @@ public class MainActivity extends ActionBarActivity {
 
     }
 
+    public void login(String url){
+
+        mytask = new RestClientStrong(url);
+
+        mytask.setMyTaskCompleteListener(new RestClientStrong.OnTaskComplete() {
+            @Override
+            public void setMyTaskComplete(String message, int number) {
+
+                Log.d("LOGIN", "Login Recibido del servidor");
+
+                try {
+                    JSONObject jsonObject = new JSONObject(mytask.getResponse());
+                    token  = jsonObject.getString("id");
+
+                    pushApp (getApplicationContext().getString(R.string.strongURLPush));
+
+                    Log.d("LOGIN", "JSON OBJECT" + jsonObject.toString());
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        });
+        mytask.AddHeader("Content-Type","application/json");
+        mytask.AddParam("email", getApplicationContext().getString(R.string.username));
+        mytask.AddParam("password", getApplicationContext().getString(R.string.password));
+        mytask.execute("POST");
+
+    }
 
 
     @Override
@@ -183,22 +211,21 @@ public class MainActivity extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    public void addOnAppUser(String url){
+    public void pushApp(String url){
 
-        mytask = new RestClient(url);
+        RestClientStrong taskPush = new RestClientStrong(url);
 
-        mytask.setMyTaskCompleteListener(new RestClient.OnTaskComplete() {
+        taskPush.setMyTaskCompleteListener(new RestClientStrong.OnTaskComplete() {
             @Override
             public void setMyTaskComplete(String message, int number) {
 
-                Log.d("MYTASK", "APPList recibido del servidor");
+                Log.d("PUSH", "ODPUSH recibido");
 
                 try {
                     JSONObject jsonObject = new JSONObject(mytask.getResponse());
-                    JSONObject result  = jsonObject.getJSONObject("result");
-                    reqId=result.getString("objectId");
-
-                    Log.d("MYTASK", "JSON OBJECT" + jsonObject.toString()+" - -" + reqId);
+                    reqId = jsonObject.getString("id");
+                    notifyDevice();
+                    Log.d("ODPUSH", "JSON OBJECT" + jsonObject.toString());
 
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -206,23 +233,19 @@ public class MainActivity extends ActionBarActivity {
 
             }
         });
-        String version = Build.VERSION.RELEASE;
 
-        TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        final TelephonyManager tm = (TelephonyManager) getApplicationContext().getSystemService(Context.TELEPHONY_SERVICE);
 
-        String s1 = getString(R.string.X_Parse_Application_Id);
-        String s2 = getString(R.string.X_Parse_REST_API_Key);
-        mytask.AddParam("imsi", tm.getSubscriberId());
-        mytask.AddParam("userId", "7FO6tM161x");
-        mytask.AddParam("mcc", "732");
-        mytask.AddParam("mnc", "103");
-        mytask.AddParam("appName", "Deezer");
-        mytask.AddParam("version", "23");
-        mytask.AddParam("appId", "LDPrNXHyBC");
-        mytask.AddHeader("X-Parse-Application-Id",s1);
-        mytask.AddHeader("X-Parse-REST-API-Key",s2);
-        mytask.AddHeader("Content-Type","application/json");
-        mytask.execute("POST");
+        taskPush.AddUrlParam("access_token", token); //Add authentication
+        taskPush.AddParam("atomAppId", getApplicationContext().getString(R.string.atomAppId));
+        taskPush.AddParam("imsi", tm.getSubscriberId());
+        taskPush.AddParam("storeName", "Tienda");
+        taskPush.AddParam("storeTransactionId", "Tien234234234da");
+        taskPush.AddParam("status", "CREATE");
+        taskPush.AddParam("created", "2015-03-13 13:21:24.038Z");
+        taskPush.AddParam("lastUpdated", "2015-03-13 13:21:24.038Z");
+        taskPush.AddHeader("Content-Type","application/json");
+        taskPush.execute("POST");
 }
 
 
